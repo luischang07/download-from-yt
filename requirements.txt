@@ -1,4 +1,5 @@
-yt-dlp>=2024.11.4
 customtkinter==5.2.1
-Pillow==10.1.0
+yt-dlp>=2024.11.4
+python-vlc>=3.0.20123
+Pillow>=10.1.0
 packaging
