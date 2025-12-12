@@ -47,3 +47,6 @@ Thumbs.db
 *.mkv
 *.webm
 *.avi
+
+Output/
+
