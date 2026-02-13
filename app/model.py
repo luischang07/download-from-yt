@@ -22,11 +22,23 @@ class DownloaderModel:
     @lru_cache(maxsize=50)
     def load_thumbnail_image(self, url):
         try:
-            response = requests.get(url)
+            # Add a timeout so slow or broken requests do not hang indefinitely
+            response = requests.get(url, timeout=5)
+            # Raise for HTTP errors to avoid caching error pages as images
+            response.raise_for_status()
+
             img_data = BytesIO(response.content)
             pil_image = Image.open(img_data)
+            # Fully load the image data before closing the BytesIO
+            pil_image.load()
+            # Optionally downscale to a thumbnail to reduce memory usage in the cache
+            try:
+                pil_image.thumbnail((320, 180), Image.LANCZOS)
+            except Exception:
+                # If thumbnailing fails for any reason, fall back to the original image
+                pass
             return pil_image
-        except:
+        except (requests.RequestException, OSError, Image.UnidentifiedImageError):
             return None
 
     def load_config(self):
