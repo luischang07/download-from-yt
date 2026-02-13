@@ -182,10 +182,10 @@ class DownloaderModel:
         base_filename = filename
         counter = 1
         max_attempts = 1000
-        while f"{base_filename}.{ext}" in existing_files and counter <= max_attempts:
+        while f"{base_filename}.{ext}" in existing_files and counter < max_attempts:
             base_filename = f"{filename} (#{counter})"
             counter += 1
-        if counter > max_attempts and f"{base_filename}.{ext}" in existing_files:
+        if counter >= max_attempts:
             raise RuntimeError("Maximum attempts exceeded while generating a unique filename.")
         
         opts = {
