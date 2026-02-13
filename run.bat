@@ -6,5 +6,5 @@ echo Configurando ffmpeg...
 set PATH=%PATH%;C:\ProgramData\chocolatey\bin
 echo.
 echo Ejecutando YouTube Downloader...
-py -3  youtube_downloader.py
+py -3  main.py
 pause

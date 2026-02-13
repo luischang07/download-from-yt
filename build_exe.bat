@@ -3,7 +3,7 @@ echo Borrando versiones anteriores...
 rmdir /s /q build dist
 
 echo Creando nuevo ejecutable...
-py -3 -m PyInstaller --noconfirm --onefile --windowed --name "YTDownloader" --add-binary "ffmpeg.exe;." --add-binary "ffprobe.exe;." --hidden-import "vlc" --collect-all "customtkinter" youtube_downloader.py
+py -3 -m PyInstaller --noconfirm --onefile --windowed --name "YTDownloader" --add-binary "ffmpeg.exe;." --add-binary "ffprobe.exe;." --hidden-import "vlc" --collect-all "customtkinter" main.py
 
 echo.
 echo ==========================================

@@ -1,92 +1,66 @@
-# YouTube Video Downloader
+# YouTube Downloader Pro
 
-Aplicación con interfaz gráfica para descargar videos de YouTube con selección de calidad.
+Aplicación de escritorio profesional para descargar videos y audio de YouTube, con reproductor integrado, cola de descargas y gestión de biblioteca.
 
-## Características
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Status](https://img.shields.io/badge/Status-Active-success)
 
-- 🎨 Interfaz gráfica moderna con CustomTkinter
-- 📹 Descarga videos de YouTube en diferentes calidades
-- 🎯 Selección de calidad/resolución del video
-- 📁 Selección de carpeta de destino
-- 📊 Barra de progreso de descarga
-- 🔒 Descarga en segundo plano (no bloquea la interfaz)
+## 🚀 Características Principales
 
-## Instalación
+- **📺 Descarga Versátil**: Videos en 4K, 1080p, 720p o solo Audio (MP3).
+- **📋 Cola de Descargas**: Agrega múltiples videos y descárgalos uno tras otro automáticamente.
+- **⏯️ Reproductor Integrado**: Previsualiza videos antes de bajar y reproduce tus descargas sin salir de la app (Motor VLC).
+- **🔔 Notificaciones Inteligentes**: Avisos de escritorio nativos cuando tus descargas terminan.
+- **🔄 Actualizador Automático**: Mantén el motor de descarga (`yt-dlp`) siempre al día con un solo clic.
+- **📂 Biblioteca Multimedia**: Gestiona, busca y reproduce tus archivos descargados fácilmente.
+- **🎨 Interfaz Moderna**: Diseño oscuro/claro con CustomTkinter, fluido y fácil de usar.
 
-### 1. Crear el entorno virtual
+## 🛠️ Instalación y Uso
 
-```powershell
-python -m venv venv
-```
-
-### 2. Activar el entorno virtual
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-Si tienes problemas con la política de ejecución, ejecuta:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-### 3. Instalar dependencias
-
-```powershell
-pip install -r requirements.txt
-```
-
-## Uso
-
-### Ejecutar la aplicación
-
-```powershell
-python youtube_downloader.py
-```
-
-### Pasos para descargar un video:
-
-1. **Pegar la URL**: Copia y pega el enlace del video de YouTube
-2. **Obtener calidades**: Haz clic en "Obtener Calidades Disponibles"
-3. **Seleccionar calidad**: Elige la calidad deseada del menú desplegable
-4. **Elegir ubicación**: (Opcional) Cambia la carpeta de destino con el botón "Explorar"
-5. **Descargar**: Haz clic en "Descargar Video"
-
-## Dependencias
-
-- **yt-dlp**: Librería para descargar videos de YouTube
-- **customtkinter**: Framework moderno para interfaces gráficas
-- **Pillow**: Procesamiento de imágenes
-
-## Requisitos
-
+### Requisitos Previos
 - Python 3.8 o superior
-- Windows, macOS o Linux
+- Conexión a Internet
 
-## Notas
+### Instalación Rápida
 
-- Los videos se descargan por defecto en la carpeta "Downloads" del usuario
-- El formato final es MP4
-- La aplicación muestra el progreso de descarga en tiempo real
-- Se requiere conexión a Internet
+1. **Clonar o Descargar** este repositorio.
+2. **Ejecutar el script de instalación** (Windows):
+   ```powershell
+   ./setup_ffmpeg.ps1  # Configura FFmpeg automáticamente
+   ```
+3. **Instalar dependencias de Python**:
+   ```powershell
+   pip install -r requirements.txt
+   ```
 
-## Solución de problemas
-
-### Error de ejecución de scripts en PowerShell
-
-Si al activar el entorno virtual aparece un error de política de ejecución:
-
+### Ejecutar la Aplicación
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+python main.py
 ```
 
-### Error al descargar videos
+## 📦 Estructura del Proyecto (MVC)
 
-- Verifica que la URL sea válida
-- Asegúrate de tener conexión a Internet
-- Algunos videos pueden estar restringidos por región o privacidad
+El proyecto sigue una arquitectura Modelo-Vista-Controlador para facilitar el mantenimiento:
 
-## Licencia
+- **`app/model.py`**: Lógica de negocio, gestión de descargas (`yt-dlp`), manejo de archivos y datos.
+- **`app/view.py`**: Interfaz gráfica (GUI) construida con `customtkinter`.
+- **`app/controller.py`**: Intermediario que gestiona la interacción entre el usuario y la lógica.
+- **`app/player_frame.py`**: Componente reutilizable del reproductor de video (VLC).
 
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
+## 🔧 Dependencias Clave
+
+- `yt-dlp`: El motor de descarga más potente y actualizado.
+- `customtkinter`: UI moderna y atractiva.
+- `python-vlc`: Bindings para el reproductor VLC.
+- `plyer`: Notificaciones nativas del sistema.
+- `Pillow`: Manejo de imágenes y miniaturas.
+
+## 📝 Notas Adicionales
+
+- **FFmpeg**: La aplicación busca FFmpeg automáticamente en la carpeta del proyecto o en el sistema. Es necesario para unir video+audio en alta calidad y convertir a MP3.
+- **VLC**: Se requiere tener las librerías de VLC (`libvlc.dll`) accesibles o VLC instalado en el sistema para que funcione el reproductor integrado.
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT. Siéntete libre de usarlo, modificarlo y distribuirlo.

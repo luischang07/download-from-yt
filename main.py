@@ -1,15 +1,13 @@
-from app.model import DownloaderModel
-from app.view import DownloaderView
 from app.controller import DownloaderController
-
-
-def main():
-    model = DownloaderModel()
-    view = DownloaderView()
-    controller = DownloaderController(model, view)
-    # Start the UI loop
-    view.run()
-
+import ctypes
 
 if __name__ == "__main__":
-    main()
+    try:
+        # Configurar AppUserModelID para que Windows reconozca la app y sus notificaciones
+        myappid = 'YT Downloader'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except:
+        pass
+        
+    app = DownloaderController()
+    app.run()
