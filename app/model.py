@@ -167,9 +167,10 @@ class DownloaderModel:
         
         # Ensure unique filename to avoid skipping download
         ext = "mp3" if mode == "Audio" else "mp4"
+        existing_files = set(os.listdir(path))
         base_filename = filename
         counter = 1
-        while os.path.exists(os.path.join(path, f"{base_filename}.{ext}")):
+        while f"{base_filename}.{ext}" in existing_files:
             base_filename = f"{filename} (#{counter})"
             counter += 1
         
