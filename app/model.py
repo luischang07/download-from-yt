@@ -210,6 +210,8 @@ class DownloaderModel:
         if os.path.exists(final_file):
             garbage_exts = ['.webm', '.m4a', '.part', '.ytdl', '.orig', '.temp.mp4']
             try:
+                # Allow a short delay to ensure yt-dlp/ffmpeg and the filesystem
+                # have fully flushed and closed all related files before cleanup.
                 time.sleep(1)
                 for f in os.listdir(path):
                     if f.startswith(base_filename):
