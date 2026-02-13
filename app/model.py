@@ -186,7 +186,7 @@ class DownloaderModel:
             base_filename = f"{filename} (#{counter})"
             counter += 1
         if counter >= max_attempts:
-            raise RuntimeError("Maximum attempts exceeded while generating a unique filename.")
+            raise RuntimeError(f"Maximum attempts ({max_attempts}) exceeded while generating a unique filename for '{filename}' in directory '{path}'.")
         
         opts = {
             'outtmpl': os.path.join(path, f'{base_filename}.%(ext)s'),
