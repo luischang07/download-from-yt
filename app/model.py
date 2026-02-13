@@ -64,7 +64,6 @@ class DownloaderModel:
 
     def _get_ffmpeg_path(self):
         """Obtiene la ruta de ffmpeg dependiendo de si es script o EXE"""
-        import sys
         
         # 1. Si es un EXE compilado (PyInstaller)
         if getattr(sys, 'frozen', False):
