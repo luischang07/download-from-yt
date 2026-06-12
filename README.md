@@ -11,6 +11,7 @@ Aplicación de escritorio profesional para descargar videos y audio de YouTube, 
 - **📺 Descarga Versátil**: Videos en 4K, 1080p, 720p o solo Audio (MP3).
 - **📋 Cola de Descargas**: Agrega múltiples videos y descárgalos uno tras otro automáticamente.
 - **⏯️ Reproductor Integrado**: Previsualiza videos antes de bajar y reproduce tus descargas sin salir de la app (Motor VLC).
+- **🪟 Modo PiP (Mini Reproductor)**: Modo Picture-in-Picture sin bordes, flotante, redimensionable y con soporte para arrastrar libremente por la pantalla.
 - **🔔 Notificaciones Inteligentes**: Avisos de escritorio nativos cuando tus descargas terminan.
 - **🔄 Actualizador Automático**: Mantén el motor de descarga (`yt-dlp`) siempre al día con un solo clic.
 - **📂 Biblioteca Multimedia**: Gestiona, busca y reproduce tus archivos descargados fácilmente.

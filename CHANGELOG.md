@@ -2,10 +2,11 @@
 
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 
-## [1.2.0] - 2025-11-30
+## [1.2.1] - 2026-06-11
 ### Añadido
 - **Cola de Descargas**: Ahora puedes agregar múltiples videos a una lista y descargarlos secuencialmente.
 - **Reproductor Integrado**: Nuevo reproductor multimedia basado en VLC para previsualizar videos y reproducir archivos descargados sin salir de la app.
+- **Mini Reproductor (PiP)**: Modo Picture-in-Picture flotante, sin bordes, redimensionable y siempre visible. Permite arrastrar el reproductor por toda la pantalla de forma inteligente.
 - **Notificaciones de Escritorio**: Alertas nativas de Windows cuando finaliza una descarga o la cola completa.
 - **Actualizador Automático**: Botón para actualizar el motor `yt-dlp` directamente desde la interfaz.
 - **Biblioteca Mejorada**: Visualización de archivos descargados con miniaturas y botón de reproducción rápida.
