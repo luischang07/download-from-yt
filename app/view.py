@@ -95,46 +95,113 @@ class DownloaderView(ctk.CTk):
 
     def init_mini_player(self):
         self._is_paused = False
-        # Mini Player Frame (Solo Video - PiP Puro)
-        # Usamos Toplevel para evitar estelas (ghosting) y tener una ventana flotante real
+        import tkinter as _tk
+        _TRANS = '#010203'
+        self._pip_trans_key = _TRANS
+
         self.mini_player_frame = ctk.CTkToplevel(self)
         self.mini_player_frame.title("Mini Player")
         self.mini_player_frame.geometry("320x180")
-        self.mini_player_frame.overrideredirect(True) # Sin bordes
-        self.mini_player_frame.attributes('-topmost', True) # Siempre visible
-        self.mini_player_frame.withdraw() # Ocultar inicialmente
-        
-        # Configurar fondo negro
+        self.mini_player_frame.overrideredirect(True)
+        self.mini_player_frame.attributes('-topmost', True)
+        self.mini_player_frame.withdraw()
+        self.mini_player_frame.minsize(160, 90)
         self.mini_player_frame.configure(fg_color="black")
-        
-        # Contenedor de Video (Ocupa todo el frame)
-        self.mini_video_container = ctk.CTkFrame(self.mini_player_frame, fg_color="black", corner_radius=0)
+
+        # Create the separate controls window
+        self.mini_controls_window = _tk.Toplevel(self.mini_player_frame)
+        self.mini_controls_window.title("Mini Player Controls")
+        self.mini_controls_window.overrideredirect(True)
+        self.mini_controls_window.attributes('-topmost', True)
+        self.mini_controls_window.configure(bg=_TRANS)
+        self.mini_controls_window.wm_attributes('-transparentcolor', _TRANS)
+        self.mini_controls_window.withdraw()
+
+        # Apply rounded corners via DWM API on Windows
+        self.mini_player_frame.update_idletasks()
+        self.mini_controls_window.update_idletasks()
+        self._round_window_corners(self.mini_player_frame)
+        self._round_window_corners(self.mini_controls_window)
+
+        # Bind geometry sync to player window movements
+        self.mini_player_frame.bind("<Configure>", self._sync_controls_geometry)
+
+        from tkinter import Frame as TkFrame
+        self.mini_video_container = TkFrame(self.mini_player_frame, bg="black")
         self.mini_video_container.pack(fill="both", expand=True)
         
-        # Overlay de Controles (Barra superior, inicialmente oculta)
-        # IMPORTANTE: Debe ser hijo de mini_player_frame (hermano del video) y estar encima (lift)
-        self.mini_overlay = ctk.CTkFrame(self.mini_player_frame, fg_color="transparent", corner_radius=0)
-        
-        # Botones en Overlay (Alineados a la derecha)
-        # Cerrar (Usamos Label para evitar fondo de botón y cumplir con "fondo invisible")
-        self.mini_close_btn = ctk.CTkLabel(self.mini_overlay, text="✕", width=30, height=30, 
-                                         fg_color="transparent", text_color="#ff5555",
-                                         font=("Arial", 16), cursor="hand2")
-        self.mini_close_btn.pack(side="right", padx=5, pady=5)
-        self.mini_close_btn.bind("<Button-1>", lambda e: self.controller.stop_mini_player())
-        
-        # Regresar / Expandir
-        self.mini_expand_btn = ctk.CTkLabel(self.mini_overlay, text="⛶", width=30, height=30, 
-                                          fg_color="transparent", text_color="white",
-                                          font=("Arial", 16), cursor="hand2")
-        self.mini_expand_btn.pack(side="right", padx=5, pady=5)
+        # ---- Top-right strip on controls window ----
+        self.mini_top_strip = _tk.Frame(self.mini_controls_window, bg=_TRANS)
+
+        self.mini_expand_btn = _tk.Label(
+            self.mini_top_strip, text="⛶",
+            bg=_TRANS, fg="white", font=("Arial", 16), cursor="hand2")
+        self.mini_expand_btn.pack(side="left", padx=(5, 2), pady=5)
         self.mini_expand_btn.bind("<Button-1>", lambda e: self.controller.restore_player())
-        
-        # Asegurar que los eventos se propaguen desde los botones (Labels)
-        self.mini_close_btn.bind("<Enter>", self._show_mini_overlay)
-        self.mini_close_btn.bind("<Leave>", self._hide_mini_overlay)
-        self.mini_expand_btn.bind("<Enter>", self._show_mini_overlay)
-        self.mini_expand_btn.bind("<Leave>", self._hide_mini_overlay)
+
+        self.mini_close_btn = _tk.Label(
+            self.mini_top_strip, text="✕",
+            bg=_TRANS, fg="#ff5555", font=("Arial", 16), cursor="hand2")
+        self.mini_close_btn.pack(side="left", padx=(2, 5), pady=5)
+        self.mini_close_btn.bind("<Button-1>", lambda e: self.controller.stop_mini_player())
+
+        # ---- Bottom playback controls on controls window ----
+        self._pip_back_btn = _tk.Label(
+            self.mini_controls_window, text="⏮",
+            bg=_TRANS, fg='white', font=('Arial', 22, 'bold'),
+            cursor='hand2', bd=0, highlightthickness=0)
+        self._pip_back_btn.bind('<Button-1>', lambda e: self.controller.seek_delta(-5000))
+
+        self.mini_playpause_btn = _tk.Label(
+            self.mini_controls_window, text='⏸',
+            bg=_TRANS, fg='white', font=('Arial', 26, 'bold'),
+            cursor='hand2', bd=0, highlightthickness=0)
+        self.mini_playpause_btn.bind('<Button-1>', lambda e: self.controller.toggle_play())
+
+        self._pip_fwd_btn = _tk.Label(
+            self.mini_controls_window, text='⏭',
+            bg=_TRANS, fg='white', font=('Arial', 22, 'bold'),
+            cursor='hand2', bd=0, highlightthickness=0)
+        self._pip_fwd_btn.bind('<Button-1>', lambda e: self.controller.seek_delta(5000))
+
+        # ---- Progress slider on controls window ----
+        self.mini_progress_slider = ctk.CTkSlider(
+            self.mini_controls_window,
+            from_=0, to=100,
+            command=self._on_mini_seek,
+            height=14,
+            bg_color=_TRANS,
+            fg_color="#444444",            # Track color
+            progress_color="#ff0000",      # Progress color (red)
+            button_color="#ff0000",        # Thumb button color (red)
+            button_hover_color="#ff4d4d",
+            border_width=0
+        )
+
+        # Group for easy show/hide
+        self._pip_ctrl_btns = [self._pip_back_btn, self.mini_playpause_btn, self._pip_fwd_btn]
+
+        # Place the control overlays permanently in the controls window
+        self.mini_top_strip.place(relx=1.0, rely=0.0, anchor="ne")
+        for btn, x_off in zip(self._pip_ctrl_btns, (-52, 0, 52)):
+            btn.place(relx=0.5, rely=1.0, anchor="s", x=x_off, y=-10)
+        self.mini_progress_slider.place(relx=0.5, rely=1.0, anchor="s", relwidth=0.85, y=-55)
+
+        # Drag on top strip still moves window; hover keeps overlay visible
+        self.mini_top_strip.bind("<Button-1>",        self._start_drag)
+        self.mini_top_strip.bind("<B1-Motion>",       self._do_drag)
+        self.mini_top_strip.bind("<ButtonRelease-1>", lambda e: self._check_screen_bounds())
+        self.mini_top_strip.bind("<Enter>",           self._show_mini_overlay)
+        self.mini_top_strip.bind("<Leave>",           self._hide_mini_overlay)
+
+        for btn in (self.mini_expand_btn, self.mini_close_btn,
+                    self._pip_back_btn, self.mini_playpause_btn, self._pip_fwd_btn,
+                    self.mini_progress_slider):
+            btn.bind("<Enter>", self._show_mini_overlay)
+            btn.bind("<Leave>", self._hide_mini_overlay)
+
+        # Convenience alias
+        self.mini_overlay = self.mini_top_strip
 
         # Eventos de Mouse
         # 1. Click para Pausar/Reproducir (con detección de arrastre)
@@ -154,23 +221,75 @@ class DownloaderView(ctk.CTk):
         self.mini_overlay.bind("<Enter>", self._show_mini_overlay)
         self.mini_overlay.bind("<Leave>", self._hide_mini_overlay)
 
+        # ---- Resize handles for the borderless PiP window ----
+        # Edges first, corners last → corners are lift()-ed last and stay topmost.
+        # This ensures a corner drag always fires the corner handler (both axes),
+        # not the overlapping edge handler (single axis).
+        from tkinter import Frame as TkFrame
+        self._resize_edge = None
+        E = 6   # edge handle thickness (px)
+        C = 10  # corner handle size (px)
+        handles_cfg = [
+            # Edges first (placed below corners in z-order)
+            ('e',  'size_we',    {'relx': 1.0, 'rely': 0.0, 'anchor': 'ne', 'relheight': 1.0, 'width': E}),
+            ('w',  'size_we',    {'relx': 0.0, 'rely': 0.0, 'anchor': 'nw', 'relheight': 1.0, 'width': E}),
+            ('n',  'size_ns',    {'relx': 0.0, 'rely': 0.0, 'anchor': 'nw', 'relwidth':  1.0, 'height': E}),
+            ('s',  'size_ns',    {'relx': 0.0, 'rely': 1.0, 'anchor': 'sw', 'relwidth':  1.0, 'height': E}),
+            # Corners last (lifted on top so they take priority over edges)
+            ('se', 'size_nw_se', {'relx': 1.0, 'rely': 1.0, 'anchor': 'se', 'width': C, 'height': C}),
+            ('sw', 'size_ne_sw', {'relx': 0.0, 'rely': 1.0, 'anchor': 'sw', 'width': C, 'height': C}),
+            ('ne', 'size_ne_sw', {'relx': 1.0, 'rely': 0.0, 'anchor': 'ne', 'width': C, 'height': C}),
+            ('nw', 'size_nw_se', {'relx': 0.0, 'rely': 0.0, 'anchor': 'nw', 'width': C, 'height': C}),
+        ]
+        self._resize_handles = []
+        for name, cursor, place_cfg in handles_cfg:
+            handle = TkFrame(
+                self.mini_player_frame,
+                bg='black',
+                cursor=cursor,
+            )
+            handle.bind('<Button-1>',        lambda e, n=name: self._resize_start(e, n))
+            handle.bind('<B1-Motion>',       self._resize_do)
+            handle.bind('<ButtonRelease-1>', self._resize_end)
+            self._resize_handles.append((handle, place_cfg))
+
+    def _show_resize_handles(self):
+        if hasattr(self, '_resize_handles'):
+            for handle, place_cfg in self._resize_handles:
+                handle.place(**place_cfg)
+                handle.lift()
+
+    def _hide_resize_handles(self):
+        if hasattr(self, '_resize_handles'):
+            for handle, _ in self._resize_handles:
+                handle.place_forget()
+
     def _on_mini_click(self, event):
         if hasattr(self, '_drag_moved') and self._drag_moved:
             self._drag_moved = False
+            self._check_screen_bounds()
             return
         self.controller.toggle_play()
 
+    def _on_mini_seek(self, value):
+        if hasattr(self, 'player_frame'):
+            self.player_frame.on_seek(value)
+
     def _on_player_state_change(self, is_playing):
         self._is_paused = not is_playing
+        if hasattr(self, 'mini_playpause_btn'):
+            self.mini_playpause_btn.configure(text="▶" if self._is_paused else "⏸")
         if self._is_paused:
             self._show_mini_overlay(None)
-            # Forzar que se ponga encima del video
-            self.mini_overlay.lift()
+            if hasattr(self, 'mini_controls_window') and self.mini_controls_window.winfo_exists():
+                self.mini_controls_window.lift(self.mini_player_frame)
         else:
-            # Si se reanuda, intentar ocultar (el check verificará si el mouse sigue encima)
             self._hide_mini_overlay(None)
 
     def _start_drag(self, event):
+        # Don't start a move-drag if a resize is in progress
+        if getattr(self, '_resize_edge', None):
+            return
         self._drag_start_x = event.x_root
         self._drag_start_y = event.y_root
         
@@ -181,6 +300,7 @@ class DownloaderView(ctk.CTk):
 
     def _do_drag(self, event):
         if not hasattr(self, '_drag_start_x'): return
+        if getattr(self, '_resize_edge', None): return
         
         dx = event.x_root - self._drag_start_x
         dy = event.y_root - self._drag_start_y
@@ -192,18 +312,146 @@ class DownloaderView(ctk.CTk):
         if self._drag_moved:
             new_x = self._widget_start_x + dx
             new_y = self._widget_start_y + dy
-            # Mover ventana completa usando geometry
-            self.mini_player_frame.geometry(f"+{new_x}+{new_y}")
+            # Mover ventana completa usando geometry con coordenadas físicas directamente (CustomTkinter no escala posición)
+            self.mini_player_frame.geometry(f"+{int(new_x)}+{int(new_y)}")
+
+    # ---- PiP resize helpers ----
+    def _resize_start(self, event, edge):
+        self._resize_edge = edge
+        self._resize_start_x = event.x_root
+        self._resize_start_y = event.y_root
+        self._resize_orig_x = self.mini_player_frame.winfo_x()
+        self._resize_orig_y = self.mini_player_frame.winfo_y()
+        self._resize_orig_w = self.mini_player_frame.winfo_width()
+        self._resize_orig_h = self.mini_player_frame.winfo_height()
+
+    def _get_video_aspect_ratio(self):
+        if hasattr(self, 'player_frame') and self.player_frame.player:
+            try:
+                w, h = self.player_frame.player.video_get_size(0)
+                if w > 0 and h > 0:
+                    return w / h
+            except Exception:
+                pass
+        return 16 / 9  # Fallback to standard 16:9
+
+    def _resize_do(self, event):
+        if not self._resize_edge:
+            return
+        dx = event.x_root - self._resize_start_x
+        dy = event.y_root - self._resize_start_y
+        edge = self._resize_edge
+
+        x_orig = self._resize_orig_x
+        y_orig = self._resize_orig_y
+        w_orig = self._resize_orig_w
+        h_orig = self._resize_orig_h
+
+        scaling = self.mini_player_frame._get_window_scaling()
+        ratio = self._get_video_aspect_ratio()
+        sh = self.winfo_screenheight() * scaling
+        max_h = sh * 0.9
+        max_w = max_h * ratio
+        min_w = 320 * scaling  # doubled from 160, converted to physical
+
+        x = x_orig
+        y = y_orig
+        w = w_orig
+        h = h_orig
+
+        if edge == 'e':
+            w = max(min_w, min(max_w, w_orig + dx))
+            h = w / ratio
+        elif edge == 'w':
+            w = max(min_w, min(max_w, w_orig - dx))
+            x = x_orig + (w_orig - w)
+            h = w / ratio
+        elif edge == 's':
+            h = max(min_w / ratio, min(max_h, h_orig + dy))
+            w = h * ratio
+        elif edge == 'n':
+            h = max(min_w / ratio, min(max_h, h_orig - dy))
+            y = y_orig + (h_orig - h)
+            w = h * ratio
+        elif edge == 'se':
+            w = max(min_w, min(max_w, w_orig + dx))
+            h = w / ratio
+        elif edge == 'sw':
+            w = max(min_w, min(max_w, w_orig - dx))
+            x = x_orig + (w_orig - w)
+            h = w / ratio
+        elif edge == 'ne':
+            w = max(min_w, min(max_w, w_orig + dx))
+            h = w / ratio
+            y = (y_orig + h_orig) - h
+        elif edge == 'nw':
+            w = max(min_w, min(max_w, w_orig - dx))
+            x = (x_orig + w_orig) - w
+            h = w / ratio
+            y = (y_orig + h_orig) - h
+
+        scaling = self.mini_player_frame._get_window_scaling()
+        w_log = int(w / scaling)
+        h_log = int(h / scaling)
+        # Usar coordenadas de posición físicas directamente (CustomTkinter geometry no escala la posición)
+        self.mini_player_frame.geometry(f"{w_log}x{h_log}+{int(x)}+{int(y)}")
+
+    def _resize_end(self, event):
+        self._resize_edge = None
+        self._check_screen_bounds()
+
+    def _check_screen_bounds(self):
+        # Force pending window manager updates to ensure we have the absolute latest positions
+        self.mini_player_frame.update_idletasks()
+        w = self.mini_player_frame.winfo_width()
+        h = self.mini_player_frame.winfo_height()
+        x = self.mini_player_frame.winfo_x()
+        y = self.mini_player_frame.winfo_y()
+
+        scaling = self.mini_player_frame._get_window_scaling()
+        
+        # winfo_screenwidth/height return logical pixels, so multiply by scaling to get physical screen size
+        sw = self.winfo_screenwidth() * scaling
+        sh = self.winfo_screenheight() * scaling
+
+        adjusted = False
+        pull_back = 30 * scaling  # Pull back to leave 30px (logical) visible on screen
+
+        # Check if less than 30px is visible on left
+        if x + w < pull_back:
+            x = pull_back - w
+            adjusted = True
+        # Check if less than 30px is visible on right
+        elif x > sw - pull_back:
+            x = sw - pull_back
+            adjusted = True
+
+        # Check if less than 30px is visible on top
+        if y + h < pull_back:
+            y = pull_back - h
+            adjusted = True
+        # Check if less than 30px is visible on bottom
+        elif y > sh - pull_back:
+            y = sh - pull_back
+            adjusted = True
+
+        if adjusted:
+            # Mover de vuelta usando coordenadas de posición físicas directamente
+            self.mini_player_frame.geometry(f"+{int(x)}+{int(y)}")
+            self._sync_controls_geometry()
 
     def _show_mini_overlay(self, event):
-        # Cancelar cualquier temporizador de ocultado pendiente
         if hasattr(self, '_hide_overlay_job') and self._hide_overlay_job:
             self.after_cancel(self._hide_overlay_job)
             self._hide_overlay_job = None
-            
-        # Mostrar en la esquina superior derecha, solo ocupando el espacio necesario
-        self.mini_overlay.place(relx=1.0, y=0, anchor="ne")
-        self.mini_overlay.lift()
+
+        self._show_resize_handles()
+
+        if hasattr(self, 'mini_controls_window') and self.mini_controls_window.winfo_exists():
+            if self.mini_controls_window.state() == "withdrawn":
+                self.mini_controls_window.deiconify()
+                self._sync_controls_geometry()
+            self.mini_controls_window.lift(self.mini_player_frame)
 
     def _hide_mini_overlay(self, event):
         # Si está pausado, NO ocultar los controles
@@ -211,43 +459,98 @@ class DownloaderView(ctk.CTk):
             return
 
         # Usar un pequeño retraso para evitar parpadeos si el mouse sale y entra rápidamente
-        # o si pasa por encima de un widget hijo que no propaga el evento
         self._hide_overlay_job = self.after(100, self._check_hide_overlay)
 
     def _check_hide_overlay(self):
-        # Verificar si el mouse realmente salió del frame principal
         try:
             x, y = self.mini_player_frame.winfo_pointerxy()
-            widget_x = self.mini_player_frame.winfo_rootx()
-            widget_y = self.mini_player_frame.winfo_rooty()
-            w = self.mini_player_frame.winfo_width()
-            h = self.mini_player_frame.winfo_height()
-            
-            # Margen de seguridad (expandido ligeramente para bordes)
-            if not (widget_x <= x <= widget_x + w and widget_y <= y <= widget_y + h):
-                self.mini_overlay.place_forget()
-        except:
-            pass # Si el widget no existe o hay error, ignorar
+            wx = self.mini_player_frame.winfo_rootx()
+            wy = self.mini_player_frame.winfo_rooty()
+            w  = self.mini_player_frame.winfo_width()
+            h  = self.mini_player_frame.winfo_height()
+            if not (wx <= x <= wx + w and wy <= y <= wy + h):
+                self._hide_resize_handles()
+                if hasattr(self, 'mini_controls_window') and self.mini_controls_window.winfo_exists():
+                    self.mini_controls_window.withdraw()
+        except Exception:
+            pass
+
+    def _sync_controls_geometry(self, event=None):
+        if hasattr(self, 'mini_controls_window') and self.mini_controls_window.winfo_exists():
+            if self.mini_player_frame.state() == "normal":
+                w = self.mini_player_frame.winfo_width()
+                h = self.mini_player_frame.winfo_height()
+                x = self.mini_player_frame.winfo_x()
+                y = self.mini_player_frame.winfo_y()
+                self.mini_controls_window.geometry(f"{w}x{h}+{x}+{y}")
 
     def show_mini_player(self):
-        # Mostrar ventana Toplevel
+        # Mostrar ventana Toplevel del reproductor
         self.mini_player_frame.deiconify()
-        self.mini_player_frame.lift()
         
         # Posicionar inicialmente en la esquina inferior derecha de la pantalla si no tiene posición
         # O usar la última posición conocida
         if not hasattr(self, '_mini_pos_set'):
-            ws = self.winfo_screenwidth()
-            hs = self.winfo_screenheight()
-            w = 320
-            h = 180
-            x = ws - w - 20
-            y = hs - h - 60 # Un poco arriba de la barra de tareas
-            self.mini_player_frame.geometry(f"{w}x{h}+{int(x)}+{int(y)}")
+            scaling = self.mini_player_frame._get_window_scaling()
+            sw_log = self.winfo_screenwidth()
+            sh_log = self.winfo_screenheight()
+            
+            # Convert screen size to physical pixels
+            sw_phys = sw_log * scaling
+            sh_phys = sh_log * scaling
+            
+            ratio = self._get_video_aspect_ratio()
+            w_log = 320
+            h_log = int(w_log / ratio)
+            
+            # Compute window physical size
+            w_phys = w_log * scaling
+            h_phys = h_log * scaling
+            
+            # Position at bottom-right in physical coordinates
+            x_phys = sw_phys - w_phys - 20 * scaling
+            y_phys = sh_phys - h_phys - 60 * scaling
+            
+            self.mini_player_frame.geometry(f"{w_log}x{h_log}+{int(x_phys)}+{int(y_phys)}")
             self._mini_pos_set = True
+
+        self.mini_player_frame.update_idletasks()
+        
+        if getattr(self, '_is_paused', False):
+            self.mini_controls_window.deiconify()
+            self._sync_controls_geometry()
+            self.mini_controls_window.lift(self.mini_player_frame)
+            self._show_resize_handles()
+        else:
+            self.mini_controls_window.withdraw()
+            self._hide_resize_handles()
+
+        self.mini_player_frame.lift()
+        self._round_window_corners(self.mini_player_frame)
+        if hasattr(self, 'mini_controls_window') and self.mini_controls_window.winfo_exists():
+            self._round_window_corners(self.mini_controls_window)
+
+    def _round_window_corners(self, window):
+        try:
+            import ctypes
+            hwnd = ctypes.windll.user32.GetParent(window.winfo_id()) or window.winfo_id()
+            if hwnd:
+                DWMWA_WINDOW_CORNER_PREFERENCE = 33
+                DWMWCP_ROUND = 2
+                val = ctypes.c_int(DWMWCP_ROUND)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    ctypes.c_void_p(hwnd),
+                    ctypes.c_uint(DWMWA_WINDOW_CORNER_PREFERENCE),
+                    ctypes.byref(val),
+                    ctypes.sizeof(val)
+                )
+        except Exception:
+            pass
 
     def hide_mini_player(self):
         self.mini_player_frame.withdraw()
+        if hasattr(self, 'mini_controls_window') and self.mini_controls_window.winfo_exists():
+            self.mini_controls_window.withdraw()
 
     def _create_nav_btn(self, icon, text, cmd):
         btn = ctk.CTkButton(self.sidebar, text=f"  {icon}   {text}", width=180, height=45, 
@@ -265,8 +568,12 @@ class DownloaderView(ctk.CTk):
     def init_home_view(self):
         self.home_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
         
-        center_box = ctk.CTkFrame(self.home_frame, fg_color="transparent")
-        center_box.place(relx=0.5, rely=0.4, anchor="center", relwidth=0.8)
+        # Scrollable wrapper so content doesn't get clipped when the window is small
+        self._home_scroll = ctk.CTkScrollableFrame(self.home_frame, fg_color="transparent")
+        self._home_scroll.pack(fill="both", expand=True, padx=0, pady=0)
+
+        center_box = ctk.CTkFrame(self._home_scroll, fg_color="transparent")
+        center_box.pack(fill="x", expand=True, pady=(60, 20), padx=80)
         
         ctk.CTkLabel(center_box, text="Descargar Video", font=("Segoe UI", 32, "bold"), text_color=("black", "white")).pack(pady=(0, 20))
         
@@ -319,8 +626,8 @@ class DownloaderView(ctk.CTk):
                                          command=self.controller.add_to_queue)
         self.queue_add_btn.pack(pady=(0, 20))
         
-        self.path_frame = ctk.CTkFrame(self.home_frame, fg_color=("gray90", "gray15"), corner_radius=10)
-        self.path_frame.pack(side="bottom", fill="x", padx=40, pady=20)
+        self.path_frame = ctk.CTkFrame(self._home_scroll, fg_color=("gray90", "gray15"), corner_radius=10)
+        self.path_frame.pack(fill="x", padx=40, pady=20)
         
         ctk.CTkLabel(self.path_frame, text="Guardar en:", font=("Segoe UI", 12, "bold"), text_color=("gray40", "gray60")).pack(side="left", padx=(15, 5), pady=10)
         
@@ -474,7 +781,7 @@ class DownloaderView(ctk.CTk):
         self.player_frame.set_state_callback(self._on_player_state_change)
         # Vincular UI del Mini Player
         if hasattr(self, 'mini_video_container'):
-            self.player_frame.set_mini_ui(None, None, None)
+            self.player_frame.set_mini_ui(None, self.mini_progress_slider, self.mini_playpause_btn)
 
     def show_view(self, view_name):
         views = {

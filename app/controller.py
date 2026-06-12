@@ -11,6 +11,7 @@ class DownloaderController:
         self.view = DownloaderView(self)
         self.last_view = "home"
         self.all_files = []
+        self._queue_running = False  # Track whether queue processing thread is active
         
         # Iniciar en la vista Home
         self.show_view("home")
@@ -168,12 +169,24 @@ class DownloaderController:
         
         self.view.show_toast("Video agregado a la cola")
 
+        # Auto-start the queue if it was idle when this item was added
+        if not self._queue_running:
+            self._start_queue_processing()
+
     def start_queue(self):
         if not self.model.download_queue:
             messagebox.showinfo("Cola", "La cola está vacía")
             return
+        
+        if self._queue_running:
+            return  # Already processing, nothing to do
             
         self.show_view("queue")
+        self._start_queue_processing()
+
+    def _start_queue_processing(self):
+        """Internal: start the queue thread and update UI state."""
+        self._queue_running = True
         self.view.btn_start_queue.configure(state="disabled", text="Procesando...")
         
         self.model.process_queue(
@@ -190,6 +203,7 @@ class DownloaderController:
         self.view.after(0, lambda: self.view.update_queue_item_status(index, "completed"))
 
     def _on_queue_all_complete(self):
+        self._queue_running = False
         self.view.after(0, lambda: [
             self.view.btn_start_queue.configure(state="normal", text="▶ Iniciar Cola"),
             self.view.show_toast("Todas las descargas han finalizado")
@@ -275,6 +289,12 @@ class DownloaderController:
     def toggle_play(self):
         if hasattr(self.view, 'player_frame'):
             self.view.player_frame.toggle_play()
+
+    def seek_delta(self, ms):
+        """Seek the player forward/backward by ms milliseconds (used by PiP controls)."""
+        if hasattr(self.view, 'player_frame'):
+            self.view.player_frame.seek_delta(ms)
+
 
     def restore_player(self):
         self.show_view("player")

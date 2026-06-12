@@ -262,6 +262,9 @@ class MediaPlayerFrame(ctk.CTkFrame):
         self.title_label.configure(text=title)
         self.time_label.configure(text="00:00 / 00:00") # Resetear label
         self.time_slider.set(0) # Resetear slider para nuevo video
+        if getattr(self, 'mini_progress_bar', None):
+            try: self.mini_progress_bar.set(0)
+            except: pass
         
         # Configurar bindings si no se han configurado
         if not hasattr(self, 'shortcuts_bound'):
@@ -531,6 +534,9 @@ class MediaPlayerFrame(ctk.CTkFrame):
                 self.is_playing = False
                 self.btn_play.configure(text="▶") # Cambiar icono a Play
                 self.time_slider.set(100) # Poner barra al final
+                if getattr(self, 'mini_progress_bar', None):
+                    try: self.mini_progress_bar.set(100)
+                    except: pass
             # ---------------------------------------------
 
             if self.player.is_playing():
@@ -539,6 +545,11 @@ class MediaPlayerFrame(ctk.CTkFrame):
                     pos = self.player.get_position() * 100
                     self.time_slider.set(pos)
                     
+                    # Actualizar slider del mini reproductor
+                    if getattr(self, 'mini_progress_bar', None):
+                        try: self.mini_progress_bar.set(pos)
+                        except: pass
+
                     # Actualizar Label de Tiempo
                     current_ms = self.player.get_time()
                     total_ms = self.player.get_length()
@@ -551,64 +562,184 @@ class MediaPlayerFrame(ctk.CTkFrame):
         self.update_timer = self.after(1000, self.update_ui_loop)
 
     def toggle_fullscreen(self):
-        self.is_fullscreen = not self.is_fullscreen
-        # Obtener la ventana raíz
-        root = self.winfo_toplevel()
-        root.attributes('-fullscreen', self.is_fullscreen)
-        
-        # Gestionar visibilidad de la barra lateral para pantalla completa real
-        if hasattr(root, 'sidebar') and hasattr(root, 'content_area'):
-            if self.is_fullscreen:
-                root.sidebar.pack_forget()
-                # Ocultar controles inicialmente
-                self.hide_controls()
-                
-                # Bind mouse motion to root and video frame to detect movement anywhere
-                self.motion_bind_id = root.bind("<Motion>", self.on_mouse_move)
-                self.video_bind_id = self.video_frame.bind("<Motion>", self.on_mouse_move)
-            else:
-                # Restaurar barra lateral a la izquierda del contenido
-                root.sidebar.pack(side="left", fill="y", before=root.content_area)
-                
-                # Unbind events
-                if hasattr(self, 'motion_bind_id'):
-                    root.unbind("<Motion>", self.motion_bind_id)
-                else:
-                    root.unbind("<Motion>")
-                
-                if hasattr(self, 'video_bind_id'):
-                    self.video_frame.unbind("<Motion>", self.video_bind_id)
-                
-                self.show_controls()
-                if self.hide_job:
-                    self.after_cancel(self.hide_job)
-                    self.hide_job = None
-
-        # Si salimos de pantalla completa, asegurarnos de que la geometría sea correcta
-        if not self.is_fullscreen:
-            root.geometry("1000x700")
-
-    def on_mouse_move(self, event):
         if self.is_fullscreen:
-            self.show_controls()
-            self.start_hide_timer()
+            self._exit_fullscreen()
+        else:
+            self._enter_fullscreen()
+
+    # ---- Fullscreen via dedicated Toplevel (guarantees 100% screen coverage) ----
+
+    def _enter_fullscreen(self):
+        if self.is_fullscreen:
+            return
+        self.is_fullscreen = True
+        root = self.winfo_toplevel()
+
+        sw = root.winfo_screenwidth()
+        sh = root.winfo_screenheight()
+
+        # Borderless Toplevel that covers the entire monitor
+        self._fs_win = ctk.CTkToplevel(root)
+        self._fs_win.overrideredirect(True)
+        self._fs_win.geometry(f"{sw}x{sh}+0+0")
+        self._fs_win.attributes('-topmost', True)
+        self._fs_win.configure(fg_color='black')
+        self._fs_win.focus_force()
+        self._fs_win.update_idletasks()
+
+        # Native tkinter Frame for VLC (fills the whole window)
+        from tkinter import Frame as _TkFrame
+        self._fs_video_frame = _TkFrame(self._fs_win, bg='black')
+        self._fs_video_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self._fs_win.update_idletasks()
+
+        # ---- Controls overlay (auto-hide on inactivity) ----
+        self._fs_controls_bar = ctk.CTkFrame(
+            self._fs_win, height=80, fg_color='#0f0f0f', corner_radius=0)
+
+        # Progress slider
+        self._fs_slider = ctk.CTkSlider(
+            self._fs_controls_bar, from_=0, to=100,
+            command=self.on_seek, height=16,
+            fg_color='#333333', progress_color='#ff0000',
+            button_color='#ff0000', button_hover_color='#ff4d4d')
+        self._fs_slider.set(self.time_slider.get())
+        self._fs_slider.pack(fill='x', padx=0, pady=(4, 0))
+
+        btn_row = ctk.CTkFrame(self._fs_controls_bar, fg_color='transparent')
+        btn_row.pack(fill='x', padx=20, pady=(4, 12))
+
+        # Play / Pause
+        self._fs_btn_play = ctk.CTkButton(
+            btn_row, text='⏸' if self.is_playing else '▶',
+            width=45, height=45, corner_radius=22,
+            font=('Arial', 22), fg_color='white',
+            text_color='black', hover_color='#e0e0e0',
+            command=self.toggle_play)
+        self._fs_btn_play.pack(side='left', padx=10)
+
+        # Seek back / forward
+        ctk.CTkButton(btn_row, text='⏮', width=35, height=35, corner_radius=17,
+                      fg_color='transparent', hover_color='#333333',
+                      text_color='white', font=('Arial', 18),
+                      command=lambda: self.seek_delta(-5000)).pack(side='left', padx=2)
+        ctk.CTkButton(btn_row, text='⏭', width=35, height=35, corner_radius=17,
+                      fg_color='transparent', hover_color='#333333',
+                      text_color='white', font=('Arial', 18),
+                      command=lambda: self.seek_delta(5000)).pack(side='left', padx=2)
+
+        # Time label (syncs via update loop)
+        self._fs_time_label = ctk.CTkLabel(
+            btn_row, text=self.time_label.cget('text'),
+            font=('Segoe UI', 13), text_color='#aaaaaa')
+        self._fs_time_label.pack(side='left', padx=15)
+
+        # Exit fullscreen button (right side)
+        ctk.CTkButton(btn_row, text='⛶', width=40, height=40, corner_radius=20,
+                      fg_color='transparent', hover_color='#333333',
+                      text_color='white', font=('Arial', 18),
+                      command=self._exit_fullscreen).pack(side='right', padx=5)
+
+        # Keep slider in sync with main slider (piggybacking the update loop)
+        self._fs_slider_sync_job = None
+        self._sync_fs_slider()
+
+        # Mouse-move: show controls, start hide timer
+        self._fs_hide_job = None
+        self._fs_win.bind('<Motion>', self._fs_on_mouse_move)
+        self._fs_video_frame.bind('<Motion>', self._fs_on_mouse_move)
+
+        # Keyboard shortcuts on the fullscreen window
+        self._fs_win.bind('<Escape>', lambda e: self._exit_fullscreen())
+        self._fs_win.bind('<f>',      lambda e: self._exit_fullscreen())
+        self._fs_win.bind('<F>',      lambda e: self._exit_fullscreen())
+        self._fs_win.bind('<space>',  lambda e: self.toggle_play())
+        self._fs_win.bind('<Right>',  lambda e: self.seek_delta(5000))
+        self._fs_win.bind('<Left>',   lambda e: self.seek_delta(-5000))
+        self._fs_win.bind('<Up>',     lambda e: self.change_volume(5))
+        self._fs_win.bind('<Down>',   lambda e: self.change_volume(-5))
+        self._fs_win.bind('<m>',      lambda e: self.toggle_mute())
+        self._fs_win.bind('<M>',      lambda e: self.toggle_mute())
+
+        # Start hidden; will show on first mouse move
+        self._fs_controls_showing = False
+
+        # Switch VLC output to the fullscreen window
+        self.switch_output(self._fs_video_frame.winfo_id())
+
+    def _exit_fullscreen(self):
+        if not self.is_fullscreen:
+            return
+        self.is_fullscreen = False
+
+        # Cancel sync job
+        if hasattr(self, '_fs_slider_sync_job') and self._fs_slider_sync_job:
+            self.after_cancel(self._fs_slider_sync_job)
+            self._fs_slider_sync_job = None
+
+        # Cancel hide timer
+        if hasattr(self, '_fs_hide_job') and self._fs_hide_job:
+            self.after_cancel(self._fs_hide_job)
+            self._fs_hide_job = None
+
+        # Switch output back to main player frame
+        self.switch_output(self.video_frame.winfo_id())
+
+        # Destroy fullscreen window
+        if hasattr(self, '_fs_win') and self._fs_win:
+            self._fs_win.destroy()
+            self._fs_win = None
+
+    def _sync_fs_slider(self):
+        """Keep the fullscreen progress slider in sync with the main player."""
+        if not self.is_fullscreen or not hasattr(self, '_fs_slider'):
+            return
+        try:
+            pos = self.time_slider.get()
+            self._fs_slider.set(pos)
+            if hasattr(self, '_fs_time_label'):
+                self._fs_time_label.configure(text=self.time_label.cget('text'))
+            if hasattr(self, '_fs_btn_play'):
+                self._fs_btn_play.configure(text='⏸' if self.is_playing else '▶')
+        except Exception:
+            pass
+        self._fs_slider_sync_job = self.after(500, self._sync_fs_slider)
+
+    def _fs_on_mouse_move(self, event):
+        self._fs_show_controls()
+        self._fs_start_hide_timer()
+
+    def _fs_show_controls(self):
+        if not hasattr(self, '_fs_controls_bar'):
+            return
+        self._fs_controls_bar.place(relx=0, rely=1.0, anchor='sw', relwidth=1)
+        self._fs_controls_bar.lift()
+        self._fs_controls_showing = True
+
+    def _fs_hide_controls(self):
+        if hasattr(self, '_fs_controls_bar'):
+            self._fs_controls_bar.place_forget()
+        self._fs_controls_showing = False
+
+    def _fs_start_hide_timer(self):
+        if hasattr(self, '_fs_hide_job') and self._fs_hide_job:
+            self.after_cancel(self._fs_hide_job)
+        self._fs_hide_job = self.after(3000, self._fs_hide_controls)
+
+    # ---- Legacy stubs kept so existing references don't break ----
+    def on_mouse_move(self, event):
+        pass  # fullscreen handled by _fs_on_mouse_move above
 
     def start_hide_timer(self):
-        if self.hide_job:
-            self.after_cancel(self.hide_job)
-        self.hide_job = self.after(3000, self.hide_controls)
+        pass
 
     def hide_controls(self):
-        if self.is_fullscreen:
-            self.top_bar.pack_forget()
-            self.controls_frame.pack_forget()
+        pass
 
     def show_controls(self):
-        # Only pack if not mapped (visible)
-        if not self.top_bar.winfo_ismapped():
-            self.top_bar.pack(fill="x", side="top", before=self.video_container)
-        if not self.controls_frame.winfo_ismapped():
-            self.controls_frame.pack(fill="x", side="bottom", after=self.video_container)
+        pass
+
+
 
     def show_controls_info(self):
         info_window = ctk.CTkToplevel(self)
