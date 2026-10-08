@@ -912,27 +912,3 @@ class DownloaderView(ctk.CTk):
                                       font=("Arial", 14), command=self.toggle_theme)
         self.theme_btn.pack(pady=20, padx=20, fill="x", side="bottom")
 
-    def load_library_items(self, items):
-        # 1. Limpiar UI
-        for widget in self.library_scroll.winfo_children(): widget.destroy()
-
-        # 2. Cargar estructura básica (Rápido)
-        for item in items:
-            card = self.create_card_skeleton(item) # Crea la tarjeta con imagen gris
-            card.pack()
-            
-            # 3. Lanzar hilo para cargar la imagen de esta tarjeta
-            threading.Thread(target=self.load_image_async, args=(card, item['image_path']), daemon=True).start()
-
-    def load_image_async(self, card_widget, image_path):
-        # Esto ocurre en segundo plano sin congelar la app
-        my_image = self.process_image(image_path) 
-        # Actualizar la UI en el hilo principal
-        self.after(0, lambda: card_widget.set_image(my_image))
-
-    from functools import lru_cache
-
-    @lru_cache(maxsize=100) # Guarda las últimas 100 imágenes en RAM
-    def load_and_resize_image(path, width, height):
-        # Tu código actual de PIL Image.open...
-        return ctk_image
