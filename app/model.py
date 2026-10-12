@@ -90,7 +90,11 @@ class DownloaderModel:
         def _thread():
             try:
                 import yt_dlp
-                opts = {'quiet': True}
+                opts = {
+                    'quiet': True,
+                    'js_runtimes': {'node': {}, 'deno': {}},
+                    'remote_components': ['ejs:github']
+                }
                 ffmpeg_loc = self._get_ffmpeg_path()
                 if ffmpeg_loc:
                     opts['ffmpeg_location'] = ffmpeg_loc
@@ -194,6 +198,8 @@ class DownloaderModel:
             'format': format_data['format_id'],
             'merge_output_format': 'mp4',
             'extractor_args': {'youtube': {'player_client': ['default']}},
+            'js_runtimes': {'node': {}, 'deno': {}},
+            'remote_components': ['ejs:github'],
             'keepvideo': False,
             'writethumbnail': True,
             'quiet': True,
